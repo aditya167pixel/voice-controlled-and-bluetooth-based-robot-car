@@ -1,0 +1,173 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// -------------------------
+// Motor Configuration
+// -------------------------
+#define IN1 26
+#define IN2 27
+#define IN3 14
+#define IN4 12
+#define ENA 25
+#define ENB 33
+
+// -------------------------
+// Bluetooth (HC-05)
+// -------------------------
+#define RXD2 16
+#define TXD2 17
+
+// -------------------------
+// Voice Recognition Sensor (DF2301QG)
+// -------------------------
+#define VOICE_RX 4         // D/T pin
+#define VOICE_TRIGGER 5    // C/R pin
+
+int speedVal = 200;
+
+// -------------------------
+// OLED Function
+// -------------------------
+void showOLED(String txt) {
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 20);
+  display.println(txt);
+  display.display();
+}
+
+// -------------------------
+// Motor Functions
+// -------------------------
+void forward() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, speedVal);
+  analogWrite(ENB, speedVal);
+  showOLED("Forward");
+}
+
+void backward() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, speedVal);
+  analogWrite(ENB, speedVal);
+  showOLED("Back");
+}
+
+void left() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, speedVal);
+  showOLED("Left");
+}
+
+void right() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, speedVal);
+  analogWrite(ENB, 0);
+  showOLED("Right");
+}
+
+void stopCar() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+  showOLED("STOP");
+}
+
+// -------------------------
+// Setup
+// -------------------------
+void setup() {
+  Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2); // Bluetooth
+  Serial1.begin(9600, SERIAL_8N1, VOICE_RX, -1); // Voice sensor (RX only)
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  pinMode(VOICE_TRIGGER, OUTPUT);
+  digitalWrite(VOICE_TRIGGER, HIGH);
+
+  // OLED init
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED ERROR!");
+    for (;;);
+  }
+
+  showOLED("READY");
+  delay(1000);
+
+  stopCar();
+}
+
+// -------------------------
+// Main Loop
+// -------------------------
+void loop() {
+
+  // -------------------------
+  // Bluetooth Commands
+  // -------------------------
+  if (Serial2.available()) {
+    char cmd = Serial2.read();
+    Serial.println(cmd);
+
+    switch (cmd) {
+      case 'F': forward(); break;
+      case 'B': backward(); break;
+      case 'L': left(); break;
+      case 'R': right(); break;
+      case 'S': stopCar(); break;
+
+      case '1': speedVal = 80;  showOLED("Speed 1"); break;
+      case '2': speedVal = 120; showOLED("Speed 2"); break;
+      case '3': speedVal = 160; showOLED("Speed 3"); break;
+      case '4': speedVal = 200; showOLED("Speed 4"); break;
+      case '5': speedVal = 255; showOLED("Speed 5"); break;
+    }
+  }
+
+  // -------------------------
+  // Voice Recognition Commands
+  // DF2301QG sends numbers for each command
+  // -------------------------
+  if (Serial1.available()) {
+    byte voiceCmd = Serial1.read();
+    Serial.print("VOICE CMD: ");
+    Serial.println(voiceCmd);
+
+    switch (voiceCmd) {
+      case 1: forward(); showOLED("VOICE FWD"); break;
+      case 2: backward(); showOLED("VOICE BACK"); break;
+      case 3: left(); showOLED("VOICE LEFT"); break;
+      case 4: right(); showOLED("VOICE RIGHT"); break;
+      case 5: stopCar(); showOLED("VOICE STOP"); break;
+    }
+  }
+}
